@@ -1,4 +1,4 @@
 node_modules
 .env
-serviceKeyConverter.json
+serviceKeyConverter.js
 serviceAccountKey.json

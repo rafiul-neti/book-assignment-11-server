@@ -13,6 +13,15 @@ admin.initializeApp({
 });
 
 const app = express();
+
+function generateTrackingId() {
+  const prefix = "PRCL";
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const random = crypto.randomBytes(3).toString("hex").toUpperCase();
+
+  return `${prefix}-${date}-${random}`;
+}
+
 // middleware
 app.use(cors());
 app.use(express.json());
@@ -43,6 +52,40 @@ const client = new MongoClient(process.env.MONGODB_URI, {
 });
 async function run() {
   try {
+    const db = client.db("bookCourier");
+    const booksColl = db.collection("books");
+    const trackingsColl = db.collection("trackings");
+
+    // logs for book tracking
+    const logTracking = async (trackingId, status) => {
+      const log = {
+        trackingId,
+        status,
+        message: status.split("_").join(" "),
+        createdAt: new Date().toLocaleString(),
+      };
+
+      const result = await trackingsColl.insertOne(log);
+      return result;
+    };
+
+    // books related api's
+    app.post("/books", async (req, res) => {
+      const bookInfo = req.body;
+
+      const trackingId = generateTrackingId();
+
+      bookInfo.createdAt = new Date().toLocaleString();
+      bookInfo.trackingId = trackingId;
+
+      const result = await booksColl.insertOne(bookInfo);
+
+      // log tracking
+      logTracking(trackingId, "book_parcel_created");
+
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
