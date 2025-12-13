@@ -2,6 +2,10 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion } = require("mongodb");
+const app = express();
+
+const crypto = require("crypto");
+
 const admin = require("firebase-admin");
 const port = process.env.PORT || 3000;
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
@@ -12,18 +16,29 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-const app = express();
-
 function generateTrackingId() {
-  const prefix = "PRCL";
+  const prefix = "BOOK";
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const random = crypto.randomBytes(3).toString("hex").toUpperCase();
 
   return `${prefix}-${date}-${random}`;
 }
 
+function generateUserId() {
+  const prefix = "USER";
+  const date = new Date().toISOString().slice(2, 14).replace(/-/g, "");
+  const random = crypto.randomBytes(5).toString("hex").toUpperCase();
+
+  return `${prefix}-${date}-${random}`;
+}
+
 // middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 // jwt middlewares
@@ -54,6 +69,7 @@ async function run() {
   try {
     const db = client.db("bookCourier");
     const booksColl = db.collection("books");
+    const usersColl = db.collection("users");
     const trackingsColl = db.collection("trackings");
 
     // logs for book tracking
@@ -68,6 +84,22 @@ async function run() {
       const result = await trackingsColl.insertOne(log);
       return result;
     };
+
+    // users related apis
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+
+      // genersting an user ID
+      const userId = generateUserId();
+
+      // adding the userRole, userID and the user creation time
+      user.userRole = "user";
+      user.createdAt = new Date().toLocaleString();
+      user.userId = userId;
+
+      const result = await usersColl.insertOne(user);
+      res.send(result);
+    });
 
     // books related api's
     app.post("/books", async (req, res) => {
