@@ -86,10 +86,23 @@ async function run() {
     };
 
     // users related apis
+    app.get("/users/:email/role", async (req, res) => {
+      const { email } = req.params;
+      const query = { email };
+      const user = await usersColl.findOne(query);
+
+      res.send({ role: user?.userRole || "user" });
+    });
+
     app.post("/users", async (req, res) => {
       const user = req.body;
 
-      // genersting an user ID
+      const existingUser = await usersColl.findOne({ email: user.email });
+      if (existingUser) {
+        return res.send({ message: "user already exists." });
+      }
+
+      // generating an user ID
       const userId = generateUserId();
 
       // adding the userRole, userID and the user creation time
