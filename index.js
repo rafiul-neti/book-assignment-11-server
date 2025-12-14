@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
 const crypto = require("crypto");
@@ -36,12 +36,12 @@ app.use(express.json());
 // jwt middlewares
 const verifyJWT = async (req, res, next) => {
   const token = req?.headers?.authorization?.split(" ")[1];
-  console.log(token);
+  // console.log(token);
   if (!token) return res.status(401).send({ message: "Unauthorized Access!" });
   try {
     const decoded = await admin.auth().verifyIdToken(token);
     req.tokenEmail = decoded.email;
-    console.log(decoded);
+    // console.log(decoded);
     next();
   } catch (err) {
     console.log(err);
@@ -63,6 +63,22 @@ async function run() {
     const booksColl = db.collection("books");
     const usersColl = db.collection("users");
     const trackingsColl = db.collection("trackings");
+    const librariansColl = db.collection("librarians");
+
+    // middleware that needs to load data from database
+    // must use after verifyFirebase middleware
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const query = { email };
+
+      const user = await usersColl.findOne(query);
+
+      if (!user || user.userRole !== "admin") {
+        return res.status(403).send({ message: "forbidden access!" });
+      }
+
+      next();
+    };
 
     // logs for book tracking
     const logTracking = async (trackingId, status) => {
@@ -120,6 +136,24 @@ async function run() {
       const result = await usersColl.insertOne(user);
       res.send(result);
     });
+
+    app.patch("/users/:id/role", verifyJWT, verifyAdmin, async (req, res) => {
+      const { id } = req.params;
+      const { role } = req.body;
+      console.log(req.body);
+
+      const query = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          userRole: role,
+        },
+      };
+
+      const result = await usersColl.updateOne(query, updatedDoc);
+      res.send(result);
+    });
+
+    // librarians related api's
 
     // books related api's
     app.post("/books", async (req, res) => {
