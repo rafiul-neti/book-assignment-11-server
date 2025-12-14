@@ -154,6 +154,15 @@ async function run() {
     });
 
     // librarians related api's
+    app.post("/librarians", async (req, res) => {
+      const librarianInfo = req.body;
+
+      librarianInfo.status = "pending";
+      librarianInfo.appliedAt = new Date().toLocaleString();
+
+      const result = await librariansColl.insertOne(librarianInfo);
+      res.send(result);
+    });
 
     // books related api's
     app.post("/books", async (req, res) => {
