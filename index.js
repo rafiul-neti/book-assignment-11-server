@@ -80,6 +80,19 @@ async function run() {
       next();
     };
 
+    const verifyLibrarian = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const query = { email };
+
+      const user = await usersColl.findOne(query);
+
+      if (!user || user.userRole !== "librarian") {
+        return res.status(403).send({ message: "forbidden access!" });
+      }
+
+      next();
+    };
+
     // logs for book tracking
     const logTracking = async (trackingId, status) => {
       const log = {
@@ -165,7 +178,7 @@ async function run() {
     });
 
     // books related api's
-    app.post("/books", async (req, res) => {
+    app.post("/books", verifyJWT, verifyLibrarian, async (req, res) => {
       const bookInfo = req.body;
 
       const trackingId = generateTrackingId();
