@@ -24,14 +24,6 @@ function generateTrackingId() {
   return `${prefix}-${date}-${random}`;
 }
 
-function generateUserId() {
-  const prefix = "USER";
-  const date = new Date().toISOString().slice(2, 14).replace(/-/g, "");
-  const random = crypto.randomBytes(5).toString("hex").toUpperCase();
-
-  return `${prefix}-${date}-${random}`;
-}
-
 // middleware
 app.use(
   cors({
@@ -86,16 +78,33 @@ async function run() {
     };
 
     // users related apis
+    app.get("/users", async (req, res) => {
+      const { searchText } = req.query;
+      const query = {};
+      if (searchText) {
+        query.$or = [
+          { displayName: { $regex: searchText, $options: "i" } },
+          { email: { $regex: searchText, $options: "i" } },
+        ];
+      }
+      const result = await usersColl.find(query).toArray();
+      res.send(result);
+    });
+
     app.get("/users/:email/role", async (req, res) => {
       const { email } = req.params;
       const query = { email };
       const user = await usersColl.findOne(query);
 
-      res.send({ role: user?.userRole || "user" });
+      res.send({
+        role: user?.userRole || "user",
+      });
     });
 
     app.post("/users", async (req, res) => {
       const user = req.body;
+
+      console.log(user);
 
       const existingUser = await usersColl.findOne({ email: user.email });
       if (existingUser) {
@@ -103,12 +112,10 @@ async function run() {
       }
 
       // generating an user ID
-      const userId = generateUserId();
 
       // adding the userRole, userID and the user creation time
       user.userRole = "user";
       user.createdAt = new Date().toLocaleString();
-      user.userId = userId;
 
       const result = await usersColl.insertOne(user);
       res.send(result);
