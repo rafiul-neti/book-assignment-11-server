@@ -167,17 +167,29 @@ async function run() {
 
     // books related api's
     app.get("/all-books", async (req, res) => {
-      const { sortByStatus, sortByDate } = req.query;
+      const { status, sortByDate, limit } = req.query;
+
+      // console.log({ status, sortByDate });
 
       const sort = {};
-      if (sortByStatus) {
-        sort.status = sortByStatus;
-      }
       if (sortByDate) {
-        sort.createdAt = sortByDate;
+        sort.createdAt = Number(sortByDate);
       }
 
-      const result = await booksColl.find().sort(sort).toArray();
+      const query = {};
+      if (status.toLowerCase() === "published") {
+        query.bookStatus = "Published";
+      } else if (status.toLowerCase() === "unpublished") {
+        query.bookStatus = "Unpublished";
+      }
+
+      const limitNum = limit ? parseInt(limit) : 0;
+
+      const result = await booksColl
+        .find(query)
+        .sort(sort)
+        .limit(limitNum)
+        .toArray();
       res.send(result);
     });
 
@@ -186,7 +198,7 @@ async function run() {
 
       const trackingId = generateTrackingId();
 
-      bookInfo.createdAt = new Date().toLocaleString();
+      bookInfo.createdAt = new Date();
       bookInfo.trackingId = trackingId;
 
       const result = await booksColl.insertOne(bookInfo);
