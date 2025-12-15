@@ -167,13 +167,28 @@ async function run() {
 
     // books related api's
     app.get("/all-books", async (req, res) => {
-      const { status, sortByDate, limit } = req.query;
+      let {
+        status,
+        sortBy,
+        limit,
+        skip,
+        sortOrder = "asc",
+        searchByTitle,
+      } = req.query;
 
       // console.log({ status, sortByDate });
 
-      const sort = {};
-      if (sortByDate) {
-        sort.createdAt = Number(sortByDate);
+      if (!["asc", "desc"].includes(sortOrder)) {
+        sortOrder = "asc";
+      }
+
+      let sort = null;
+      if (sortBy === "date") {
+        const order = sortOrder === "asc" ? 1 : -1;
+        sort = { createdAt: order };
+      } else if (sortBy === "price") {
+        const order = sortOrder === "asc" ? 1 : -1;
+        sort = { bookPrice: order };
       }
 
       const query = {};
@@ -183,14 +198,24 @@ async function run() {
         query.bookStatus = "Unpublished";
       }
 
-      const limitNum = limit ? parseInt(limit) : 0;
+      if (searchByTitle) {
+        query.bookName = { $regex: searchByTitle, $options: "i" };
+      }
 
-      const result = await booksColl
-        .find(query)
-        .sort(sort)
-        .limit(limitNum)
+      const totalBooks = await booksColl.countDocuments(query);
+
+      let cursor = booksColl.find(query);
+
+      if (sort) {
+        cursor = cursor.sort(sort);
+      }
+
+      const result = await cursor
+        .skip(Number(skip) || 0)
+        .limit(Number(limit) || 0)
         .toArray();
-      res.send(result);
+
+      res.send({ result, totalBooks });
     });
 
     app.get("/books/:id/details", async (req, res) => {
@@ -198,7 +223,7 @@ async function run() {
       const query = { _id: new ObjectId(id) };
 
       const result = await booksColl.findOne(query);
-      res.send(result)
+      res.send(result);
     });
 
     app.post("/books", verifyJWT, verifyLibrarian, async (req, res) => {
