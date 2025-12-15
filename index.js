@@ -63,7 +63,6 @@ async function run() {
     const booksColl = db.collection("books");
     const usersColl = db.collection("users");
     const trackingsColl = db.collection("trackings");
-    const librariansColl = db.collection("librarians");
 
     // middleware that needs to load data from database
     // must use after verifyFirebase middleware
@@ -107,7 +106,7 @@ async function run() {
     };
 
     // users related apis
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       const { searchText } = req.query;
       const query = {};
       if (searchText) {
@@ -120,7 +119,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users/:email/role", async (req, res) => {
+    app.get("/users/:email/role", verifyJWT, async (req, res) => {
       const { email } = req.params;
       const query = { email };
       const user = await usersColl.findOne(query);
@@ -166,18 +165,22 @@ async function run() {
       res.send(result);
     });
 
-    // librarians related api's
-    app.post("/librarians", async (req, res) => {
-      const librarianInfo = req.body;
+    // books related api's
+    app.get("/all-books", async (req, res) => {
+      const { sortByStatus, sortByDate } = req.query;
 
-      librarianInfo.status = "pending";
-      librarianInfo.appliedAt = new Date().toLocaleString();
+      const sort = {};
+      if (sortByStatus) {
+        sort.status = sortByStatus;
+      }
+      if (sortByDate) {
+        sort.createdAt = sortByDate;
+      }
 
-      const result = await librariansColl.insertOne(librarianInfo);
+      const result = await booksColl.find().sort(sort).toArray();
       res.send(result);
     });
 
-    // books related api's
     app.post("/books", verifyJWT, verifyLibrarian, async (req, res) => {
       const bookInfo = req.body;
 
