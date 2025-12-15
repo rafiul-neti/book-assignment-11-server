@@ -193,6 +193,14 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/books/:id/details", async (req, res) => {
+      const { id } = req.params;
+      const query = { _id: new ObjectId(id) };
+
+      const result = await booksColl.findOne(query);
+      res.send(result)
+    });
+
     app.post("/books", verifyJWT, verifyLibrarian, async (req, res) => {
       const bookInfo = req.body;
 
