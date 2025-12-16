@@ -63,6 +63,7 @@ async function run() {
     const booksColl = db.collection("books");
     const usersColl = db.collection("users");
     const trackingsColl = db.collection("trackings");
+    const ordersColl = db.collection("orders");
 
     // middleware that needs to load data from database
     // must use after verifyFirebase middleware
@@ -260,6 +261,17 @@ async function run() {
       };
 
       const result = await booksColl.updateOne(query, updateStatus);
+      res.send(result);
+    });
+
+    // orders related api's
+    app.post("/orders", async (req, res) => {
+      const orderInfo = req.body;
+
+      orderInfo.orderStatus = "pending";
+      orderInfo.paymentStatus = "unpaid";
+
+      const result = await ordersColl.insertOne(orderInfo);
       res.send(result);
     });
 
