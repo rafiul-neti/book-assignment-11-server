@@ -266,8 +266,18 @@ async function run() {
 
     // orders related api's
     app.get("/orders", async (req, res) => {
-      const { email } = req.query;
-      const query = { customerEmail: email };
+      const { customerEmail, librarianEmail } = req.query;
+      
+      const query = {};
+      if (customerEmail || librarianEmail) {
+        if (customerEmail) {
+          query.customerEmail = customerEmail;
+        }
+
+        if (librarianEmail) {
+          query.librarianEmail = librarianEmail;
+        }
+      }
 
       const result = await ordersColl.find(query).toArray();
       res.send(result);
