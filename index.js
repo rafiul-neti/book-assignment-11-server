@@ -283,6 +283,21 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/orders/:id", verifyJWT, async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      const query = { _id: new ObjectId(id) };
+      const updatedStatus = {
+        $set: {
+          orderStatus: status,
+        },
+      };
+
+      const result = await ordersColl.updateOne(query, updatedStatus);
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
