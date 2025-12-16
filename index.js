@@ -167,35 +167,37 @@ async function run() {
 
     // books related api's
     app.get("/all-books", async (req, res) => {
-      let {
-        status,
-        sortBy,
-        limit,
-        skip,
-        sortOrder = "asc",
-        searchByTitle,
-      } = req.query;
+      let { status, email, sortBy, limit, skip, sortOrder, searchByTitle } =
+        req.query;
 
       // console.log({ status, sortByDate });
 
-      if (!["asc", "desc"].includes(sortOrder)) {
-        sortOrder = "asc";
-      }
-
       let sort = null;
-      if (sortBy === "date") {
+
+      if (sortBy && sortOrder && ["asc", "desc"].includes(sortOrder)) {
         const order = sortOrder === "asc" ? 1 : -1;
-        sort = { createdAt: order };
-      } else if (sortBy === "price") {
-        const order = sortOrder === "asc" ? 1 : -1;
-        sort = { bookPrice: order };
+
+        if (sortBy === "date") {
+          sort = { createdAt: order };
+        }
+
+        if (sortBy === "price") {
+          sort = { bookPrice: order };
+        }
       }
 
       const query = {};
-      if (status.toLowerCase() === "published") {
-        query.bookStatus = "Published";
-      } else if (status.toLowerCase() === "unpublished") {
-        query.bookStatus = "Unpublished";
+      if (status) {
+        if (status.toLowerCase() === "published") {
+          query.bookStatus = "Published";
+        } else if (status.toLowerCase() === "unpublished") {
+          query.bookStatus = "Unpublished";
+        }
+      }
+
+      // for to get how many books added by a single librarian
+      if (email) {
+        query.librarianEmail = email;
       }
 
       if (searchByTitle) {
@@ -215,7 +217,7 @@ async function run() {
         .limit(Number(limit) || 0)
         .toArray();
 
-      res.send({ result, totalBooks });
+      res.send({ success: true, result, totalBooks });
     });
 
     app.get("/books/:id/details", async (req, res) => {
@@ -243,6 +245,21 @@ async function run() {
       // log tracking
       logTracking(trackingId, "book_parcel_created");
 
+      res.send(result);
+    });
+
+    app.patch("/books/:id", verifyJWT, verifyLibrarian, async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      const query = { _id: new ObjectId(id) };
+      const updateStatus = {
+        $set: {
+          bookStatus: status,
+        },
+      };
+
+      const result = await booksColl.updateOne(query, updateStatus);
       res.send(result);
     });
 
