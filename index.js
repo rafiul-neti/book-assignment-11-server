@@ -265,6 +265,14 @@ async function run() {
     });
 
     // orders related api's
+    app.get("/orders", async (req, res) => {
+      const { email } = req.query;
+      const query = { customerEmail: email };
+
+      const result = await ordersColl.find(query).toArray();
+      res.send(result);
+    });
+
     app.post("/orders", async (req, res) => {
       const orderInfo = req.body;
 
