@@ -249,7 +249,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/books/:id", verifyJWT, verifyLibrarian, async (req, res) => {
+    app.patch("/books/:id", verifyJWT, async (req, res) => {
       const { id } = req.params;
       const { status } = req.body;
 
@@ -264,10 +264,26 @@ async function run() {
       res.send(result);
     });
 
+    app.delete("/books/:id", verifyJWT, verifyAdmin, async (req, res) => {
+      const { id } = req.params;
+
+      const query = { _id: new ObjectId(id) };
+      const orderDeleteQuery = { bookId: id };
+
+      const result = await booksColl.deleteOne(query);
+      const deleteOrders = await ordersColl.deleteMany(orderDeleteQuery);
+
+      res.send({
+        success: true,
+        bookDeletation: result,
+        orderDeletation: deleteOrders,
+      });
+    });
+
     // orders related api's
     app.get("/orders", async (req, res) => {
       const { customerEmail, librarianEmail } = req.query;
-      
+
       const query = {};
       if (customerEmail || librarianEmail) {
         if (customerEmail) {
