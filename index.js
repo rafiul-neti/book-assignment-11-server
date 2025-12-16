@@ -223,7 +223,11 @@ async function run() {
       const query = { _id: new ObjectId(id) };
 
       const result = await booksColl.findOne(query);
-      res.send(result);
+
+      const librarianQuery = { email: result.librarianEmail };
+      const whoIsLibrarian = await usersColl.findOne(librarianQuery);
+
+      res.send({ success: true, result, whoIsLibrarian });
     });
 
     app.post("/books", verifyJWT, verifyLibrarian, async (req, res) => {
