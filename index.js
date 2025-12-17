@@ -64,6 +64,7 @@ async function run() {
     const usersColl = db.collection("users");
     const trackingsColl = db.collection("trackings");
     const ordersColl = db.collection("orders");
+    const wishlistsColl = db.collection("wishlists");
 
     // middleware that needs to load data from database
     // must use after verifyFirebase middleware
@@ -302,6 +303,19 @@ async function run() {
     app.post("/orders", async (req, res) => {
       const orderInfo = req.body;
 
+      const existingOrder = await ordersColl.findOne({
+        bookId: orderInfo.bookId,
+        customerEmail: orderInfo.customerEmail,
+      });
+
+      console.log(existingOrder);
+      if (existingOrder) {
+        return res.send({
+          message:
+            "Sorry! You've already ordered this book. We haven't added the multiple order functionalities yet.",
+        });
+      }
+
       orderInfo.orderStatus = "pending";
       orderInfo.paymentStatus = "unpaid";
 
@@ -321,6 +335,51 @@ async function run() {
       };
 
       const result = await ordersColl.updateOne(query, updatedStatus);
+      res.send(result);
+    });
+
+    // wishlist related api
+    app.get("/wishlists", verifyJWT, async (req, res) => {
+      const { email } = req.query;
+      const query = { wishlister: email };
+
+      const result = await wishlistsColl.find(query).toArray();
+      res.send(result);
+    });
+
+    app.post("/wishlist", verifyJWT, async (req, res) => {
+      const favBook = req.body;
+
+      favBook.bookId = new ObjectId(favBook._id);
+      // Remove book _id
+      delete favBook._id;
+
+      console.log(favBook);
+
+      const query = {
+        bookId: favBook.bookId,
+        wishlister: favBook.wishlister,
+      };
+
+      const existingBook = await wishlistsColl.findOne(query);
+
+      if (existingBook) {
+        return res.send({ message: "Book already in wishlist." });
+      }
+
+      const result = await wishlistsColl.insertOne(favBook);
+      res.send(result);
+    });
+
+    app.delete("/wishlists/:id", verifyJWT, async (req, res) => {
+      const { id } = req.params;
+      const { userEmail } = req.query;
+
+      // console.log({ from: "delete wishlist", id, userEmail });
+
+      const query = { bookId: new ObjectId(id), wishlister: userEmail };
+      const result = await wishlistsColl.deleteOne(query);
+
       res.send(result);
     });
 
