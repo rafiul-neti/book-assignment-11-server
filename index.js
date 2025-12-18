@@ -424,6 +424,62 @@ async function run() {
       res.send({ url: session.url });
     });
 
+    app.patch("/payment-success", async (req, res) => {
+      const sessionId = req.query.session_id;
+
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+      const transactionId = session.payment_intent;
+
+      const query = { transactionId: transactionId };
+      const paymentExist = await paymentsColl.findOne(query);
+
+      if (paymentExist) {
+        return res.send({
+          message: "payment already exist",
+          transactionId,
+          trackingId: paymentExist.trackingId,
+        });
+      }
+
+      if (session.payment_status === "paid") {
+        const { bookId, bookName, trackingId } = session.metadata;
+        const query = { bookId, customerEmail: session.customer_email };
+        const update = {
+          $set: {
+            paymentStatus: "paid",
+          },
+        };
+
+        const result = await ordersColl.updateOne(query, update);
+
+        const payment = {
+          amount: session.amount_total / 100,
+          currency: session.currency,
+          customerEmail: session.customer_email,
+          bookId,
+          bookName,
+          transactionId: session.payment_intent,
+          paymentStatus: session.payment_status,
+          paidAt: new Date(),
+          trackingId,
+        };
+
+        const resultPayment = await paymentsColl.insertOne(payment);
+
+        logTracking(trackingId, "payment_completed");
+
+        return res.send({
+          success: true,
+          modifyParcel: result,
+          trackingId: trackingId,
+          transactionId: session.payment_intent,
+          paymentInfo: resultPayment,
+        });
+      }
+      return res.send({ success: false });
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
