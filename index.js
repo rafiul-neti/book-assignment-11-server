@@ -335,7 +335,7 @@ async function run() {
 
     app.patch("/orders/:id", verifyJWT, async (req, res) => {
       const { id } = req.params;
-      const { status } = req.body;
+      const { status, trackingId } = req.body;
 
       const query = { _id: new ObjectId(id) };
       const updatedStatus = {
@@ -345,6 +345,9 @@ async function run() {
       };
 
       const result = await ordersColl.updateOne(query, updatedStatus);
+
+      logTracking(trackingId, `book_order_${status}`);
+
       res.send(result);
     });
 
@@ -394,6 +397,17 @@ async function run() {
     });
 
     // payment related api's
+    app.get("/payments", verifyJWT, async (req, res) => {
+      const { user } = req.query;
+      const query = { customerEmail: user };
+
+      const result = await paymentsColl
+        .find(query)
+        .sort({ paidAt: -1 })
+        .toArray();
+      res.send(result);
+    });
+
     app.post("/payment-checkout-session", async (req, res) => {
       const bookInfo = req.body;
 
@@ -478,6 +492,15 @@ async function run() {
         });
       }
       return res.send({ success: false });
+    });
+
+    // book parcel tracking related api's
+    app.get("/trackings/:trackingId", async (req, res) => {
+      const { trackingId } = req.params;
+      const query = { trackingId };
+
+      const result = await trackingsColl.find(query).toArray();
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
