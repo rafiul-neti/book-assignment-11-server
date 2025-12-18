@@ -4,6 +4,8 @@ const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 
+const stripe = require("stripe")(process.env.PAYMENT);
+
 const crypto = require("crypto");
 
 const admin = require("firebase-admin");
@@ -12,6 +14,7 @@ const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
   "utf-8"
 );
 const serviceAccount = JSON.parse(decoded);
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
@@ -31,6 +34,7 @@ app.use(
     credentials: true,
   })
 );
+
 app.use(express.json());
 
 // jwt middlewares
@@ -57,6 +61,7 @@ const client = new MongoClient(process.env.MONGODB_URI, {
     deprecationErrors: true,
   },
 });
+
 async function run() {
   try {
     const db = client.db("bookCourier");
@@ -65,6 +70,7 @@ async function run() {
     const trackingsColl = db.collection("trackings");
     const ordersColl = db.collection("orders");
     const wishlistsColl = db.collection("wishlists");
+    const paymentsColl = db.collection("payments");
 
     // middleware that needs to load data from database
     // must use after verifyFirebase middleware
@@ -237,16 +243,9 @@ async function run() {
     app.post("/books", verifyJWT, verifyLibrarian, async (req, res) => {
       const bookInfo = req.body;
 
-      const trackingId = generateTrackingId();
-
       bookInfo.createdAt = new Date();
-      bookInfo.trackingId = trackingId;
 
       const result = await booksColl.insertOne(bookInfo);
-
-      // log tracking
-      logTracking(trackingId, "book_parcel_created");
-
       res.send(result);
     });
 
@@ -296,7 +295,10 @@ async function run() {
         }
       }
 
-      const result = await ordersColl.find(query).toArray();
+      const result = await ordersColl
+        .find(query)
+        .sort({ orderedAt: -1 })
+        .toArray();
       res.send(result);
     });
 
@@ -316,10 +318,18 @@ async function run() {
         });
       }
 
+      // generating trackingId for order
+      const trackingId = generateTrackingId();
+
       orderInfo.orderStatus = "pending";
       orderInfo.paymentStatus = "unpaid";
+      orderInfo.trackingId = trackingId;
 
       const result = await ordersColl.insertOne(orderInfo);
+
+      // log tracking
+      logTracking(trackingId, "book_has_ordered");
+
       res.send(result);
     });
 
@@ -381,6 +391,37 @@ async function run() {
       const result = await wishlistsColl.deleteOne(query);
 
       res.send(result);
+    });
+
+    // payment related api's
+    app.post("/payment-checkout-session", async (req, res) => {
+      const bookInfo = req.body;
+
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "bdt",
+              unit_amount: parseInt(bookInfo.bookPrice * 100),
+              product_data: {
+                name: `Please pay for ${bookInfo.bookName}`,
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        customer_email: bookInfo.customerEmail,
+        mode: "payment",
+        metadata: {
+          bookId: bookInfo.bookId,
+          bookName: bookInfo.bookName,
+          trackingId: bookInfo.trackingId,
+        },
+        success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancelled`,
+      });
+
+      res.send({ url: session.url });
     });
 
     // Send a ping to confirm a successful connection
