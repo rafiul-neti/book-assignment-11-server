@@ -71,6 +71,7 @@ async function run() {
     const ordersColl = db.collection("orders");
     const wishlistsColl = db.collection("wishlists");
     const paymentsColl = db.collection("payments");
+    const reviewsAndRatingsColl = db.collection("reviewsAndRatings");
 
     // middleware that needs to load data from database
     // must use after verifyFirebase middleware
@@ -500,6 +501,69 @@ async function run() {
       const query = { trackingId };
 
       const result = await trackingsColl.find(query).toArray();
+      res.send(result);
+    });
+
+    // review-rating related api's
+    app.get("/ratings-reviews/:id", async (req, res) => {
+      const { id } = req.params;
+      const query = { bookId: id };
+
+      const result = await reviewsAndRatingsColl.find(query).toArray();
+
+      const pipeline = [
+        {
+          $match: query,
+        },
+        {
+          $group: {
+            _id: "$bookId",
+            avgRating: { $avg: "$givenRating" },
+          },
+        },
+      ];
+
+      const avgRating = await reviewsAndRatingsColl
+        .aggregate(pipeline)
+        .toArray();
+
+      const response = avgRating.length
+        ? { result, avgRating: avgRating[0].avgRating }
+        : { result, avgRating: 0 };
+
+      res.send(response);
+    });
+
+    app.post("/ratings-reviews", verifyJWT, async (req, res) => {
+      const reviewInfo = req.body;
+
+      const { bookId, reviewerEmail } = reviewInfo;
+      const query = { bookId, customerEmail: reviewerEmail };
+      const haveOrdered = await ordersColl.findOne(query);
+
+      if (!haveOrdered) {
+        return res.send({
+          success: false,
+          message:
+            "Sorry! You can't review this book. You haven't ordered it yet!",
+        });
+      }
+
+      const alreadyReviewed = await reviewsAndRatingsColl.findOne({
+        bookId,
+        reviewerEmail,
+      });
+
+      if (alreadyReviewed) {
+        return res.send({
+          success: false,
+          message: "Sorry! You've already reviewed this book.",
+        });
+      }
+
+      reviewInfo.reviewedAt = new Date();
+
+      const result = await reviewsAndRatingsColl.insertOne(reviewInfo);
       res.send(result);
     });
 
