@@ -2,3 +2,6 @@ node_modules
 .env
 serviceKeyConverter.js
 serviceAccountKey.json
+.vercel
+.gitignore
+serviceKeyConverter.js

@@ -15,9 +15,11 @@ const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
 );
 const serviceAccount = JSON.parse(decoded);
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 function generateTrackingId() {
   const prefix = "BOOK";
@@ -30,7 +32,7 @@ function generateTrackingId() {
 // middleware
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "https://bookcourier-ace9a.web.app",
     credentials: true,
   })
 );
